@@ -1,0 +1,191 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * { box-sizing: border-box; }
+  body {
+    @apply bg-slate-50 text-slate-900;
+    font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  ::selection { background: #dbeafe; color: #1e3a8a; }
+}
+
+@layer components {
+  /* ── Buttons ── */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 font-semibold rounded-xl transition-all duration-200 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed select-none;
+  }
+  .btn-primary {
+    @apply btn bg-blue-900 hover:bg-blue-800 text-white px-5 py-2.5 text-sm shadow-sm hover:shadow-md active:scale-[0.98];
+  }
+  .btn-secondary {
+    @apply btn bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 hover:border-slate-300 px-5 py-2.5 text-sm shadow-sm;
+  }
+  .btn-danger {
+    @apply btn bg-red-600 hover:bg-red-700 text-white px-5 py-2.5 text-sm shadow-sm;
+  }
+  .btn-success {
+    @apply btn bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 text-sm shadow-sm;
+  }
+  .btn-ghost {
+    @apply btn bg-transparent hover:bg-slate-100 text-slate-600 hover:text-slate-900 px-4 py-2 text-sm;
+  }
+  .btn-sm {
+    @apply px-3 py-1.5 text-xs rounded-lg;
+  }
+  .btn-lg {
+    @apply px-7 py-3.5 text-base rounded-xl;
+  }
+  .btn-icon {
+    @apply btn p-2 rounded-lg bg-transparent hover:bg-slate-100 text-slate-500 hover:text-slate-700;
+  }
+
+  /* ── Cards ── */
+  .card {
+    @apply bg-white rounded-2xl border border-slate-100 p-6;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.04);
+  }
+  .card-hover {
+    @apply card cursor-pointer;
+    transition: box-shadow 0.2s ease;
+  }
+  .card-hover:hover {
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1), 0 8px 32px rgba(0,0,0,0.06);
+  }
+  .card-stat {
+    @apply card flex items-center gap-4;
+    animation: fadeUp 0.4s ease forwards;
+  }
+
+  /* ── Forms ── */
+  .input {
+    @apply w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 text-sm focus:outline-none focus:border-blue-400 focus:ring-2 transition-all duration-150;
+    --tw-ring-color: rgba(96, 165, 250, 0.2);
+  }
+  .input:focus {
+    --tw-ring-shadow: 0 0 0 2px var(--tw-ring-color);
+    box-shadow: var(--tw-ring-shadow);
+  }
+  .input-error {
+    @apply border-red-400;
+  }
+  .input-error:focus {
+    --tw-ring-color: rgba(248, 113, 113, 0.2);
+    border-color: #f87171;
+  }
+  .label {
+    @apply block text-xs text-slate-600 mb-1.5 tracking-wide uppercase;
+    font-weight: 700;
+  }
+  .select {
+    @apply input appearance-none cursor-pointer;
+  }
+  .textarea {
+    @apply input resize-none;
+  }
+
+  /* ── Badges ── */
+  .badge {
+    @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold;
+  }
+  .badge-active {
+    @apply badge bg-emerald-50 text-emerald-700 border border-emerald-200;
+  }
+  .badge-completed {
+    @apply badge bg-blue-50 text-blue-700 border border-blue-200;
+  }
+  .badge-admin {
+    @apply badge bg-violet-50 text-violet-700 border border-violet-200;
+  }
+  .badge-faculty {
+    @apply badge bg-blue-50 text-blue-700 border border-blue-200;
+  }
+  .badge-warden {
+    @apply badge bg-amber-50 text-amber-700 border border-amber-200;
+  }
+  .badge-inactive {
+    @apply badge bg-slate-100 text-slate-500 border border-slate-200;
+  }
+
+  /* ── Table ── */
+  .table-wrap {
+    @apply rounded-xl border border-slate-200 overflow-x-auto;
+  }
+  .table {
+    @apply w-full text-sm;
+  }
+  .table thead {
+    @apply bg-slate-50 border-b border-slate-200;
+  }
+  .table th {
+    @apply px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-widest whitespace-nowrap;
+  }
+  .table td {
+    @apply px-4 py-3.5 text-slate-700 border-b border-slate-50;
+  }
+  .table tbody tr:last-child td {
+    @apply border-0;
+  }
+  .table tbody tr {
+    @apply transition-colors;
+  }
+  .table tbody tr:hover {
+    @apply bg-slate-50;
+  }
+
+  /* ── Page layout ── */
+  .page-header {
+    @apply mb-7;
+    animation: fadeUp 0.4s ease forwards;
+  }
+  .page-title {
+    @apply text-2xl font-bold text-slate-900 tracking-tight;
+  }
+  .page-sub {
+    @apply text-sm text-slate-500 mt-1;
+  }
+
+  /* ── Divider ── */
+  .divider {
+    @apply border-t border-slate-100 my-4;
+  }
+
+  /* ── Spinner ── */
+  .spinner {
+    @apply w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin;
+  }
+}
+
+/* ── Keyframes ── */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* ── Utility animations ── */
+.animate-fade-up  { animation: fadeUp 0.4s ease forwards; }
+.animate-fade-in  { animation: fadeIn 0.3s ease forwards; }
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: #f1f5f9; }
+::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+/* ── Focus glow ── */
+.shadow-glow {
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+}
+
+/* ── Toaster font override ── */
+[data-hot-toast] {
+  font-family: 'Plus Jakarta Sans', system-ui !important;
+  font-size: 13px !important;
+}
