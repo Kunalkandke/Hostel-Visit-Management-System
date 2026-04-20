@@ -12,7 +12,7 @@ HVMS is a full-stack web application for managing hostel visit workflows with ro
 
 ### Backend (`backend`)
 - Node.js + Express
-- MongoDB + Mongoose
+- Supabase (PostgreSQL)
 - JWT Authentication
 - Nodemailer (email notifications)
 
@@ -20,7 +20,7 @@ HVMS is a full-stack web application for managing hostel visit workflows with ro
 
 ## ✅ Requirements
 - Node.js 18+ (recommended)
-- MongoDB (local or Atlas)
+- Supabase project (URL + service role key)
 - Gmail App Password (only if you want email notifications)
 
 ---
@@ -41,9 +41,8 @@ HVM System(WEBSITE)/
 │  ├─ middleware/
 │  │  ├─ authMiddleware.js
 │  │  └─ helpers.js
-│  ├─ models/
-│  │  ├─ index.js
-│  │  └─ User.js
+│  ├─ data/
+│  │  └─ db.js
 │  ├─ routes/
 │  │  ├─ authRoutes.js
 │  │  ├─ hostelRoutes.js
@@ -58,7 +57,8 @@ HVM System(WEBSITE)/
 │  ├─ app.js
 │  ├─ server.js
 │  ├─ package.json
-│  └─ .env.example
+│  ├─ .env.example
+│  └─ config/supabase.js
 ├─ frontend/
 │  ├─ app/
 │  │  ├─ admin/
@@ -134,7 +134,8 @@ Create `backend/.env`:
 
 ```env
 PORT=5000
-MONGODB_URI=Your_MongoDB_URL
+SUPABASE_URL=https://your-project-ref.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
 JWT_SECRET=change_this_to_something_long_and_random
 NODE_ENV=development
 FRONTEND_URL=http://localhost:3000
@@ -151,6 +152,68 @@ SMTP_FROM_NAME=Hostel Visit Management System
 ```
 
 > Admin account is auto-created from `.env` on first startup.
+
+### Supabase SQL bootstrap (required once)
+Run this SQL in **Supabase SQL Editor**:
+
+```sql
+create extension if not exists pgcrypto;
+
+create table if not exists public.users (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  email text not null unique,
+  password text not null,
+  role text not null check (role in ('admin','faculty','warden')),
+  department text default '',
+  phone text default '',
+  profile_photo text default '',
+  assigned_hostel uuid null,
+  is_active boolean not null default true,
+  must_change_password boolean not null default false,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.hostels (
+  id uuid primary key default gen_random_uuid(),
+  name text not null unique,
+  type text not null check (type in ('boys','girls')),
+  capacity integer not null check (capacity > 0),
+  location text not null,
+  warden uuid null references public.users(id) on delete set null,
+  is_active boolean not null default true,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+alter table public.users
+  add constraint if not exists users_assigned_hostel_fkey
+  foreign key (assigned_hostel) references public.hostels(id) on delete set null;
+
+create table if not exists public.visits (
+  id uuid primary key default gen_random_uuid(),
+  faculty uuid not null references public.users(id) on delete cascade,
+  hostel uuid not null references public.hostels(id) on delete cascade,
+  purpose text not null check (purpose in ('inspection','student_meeting','routine_check','emergency','other')),
+  purpose_detail text,
+  check_in timestamptz not null default now(),
+  check_out timestamptz,
+  duration integer,
+  status text not null default 'active' check (status in ('active','completed')),
+  faculty_remarks text,
+  warden_remarks text,
+  is_verified boolean not null default false,
+  form_submissions jsonb not null default '[]'::jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists idx_visits_faculty_status on public.visits (faculty, status);
+create index if not exists idx_visits_hostel_status on public.visits (hostel, status);
+create index if not exists idx_visits_check_in on public.visits (check_in desc);
+create index if not exists idx_users_role on public.users (role);
+```
 
 ---
 
@@ -214,6 +277,7 @@ npm start
 ## 🏗️ Production Notes
 - Set `FRONTEND_URL` in `backend/.env` to your deployed frontend domain for CORS.
 - Set `NEXT_PUBLIC_API_URL` in `frontend/.env.local` (or your hosting provider env vars) to your deployed backend, e.g. `https://api.example.com/api/v1`.
+- Set `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` in backend environment variables.
 - Build frontend with `npm run build` and serve via `npm start`.
 
 ---

@@ -1,4 +1,4 @@
-const { Visit } = require('../models/index');
+const db = require('../data/db');
 const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
@@ -8,25 +8,21 @@ exports.submitForm = async (req, res, next) => {
   try {
     const { formType, data } = req.body;
     if (!formType || !data) return res.status(400).json({ success: false, message: 'formType and data required' });
-    const visit = await Visit.findById(req.params.id);
+    const visit = await db.findVisitById(req.params.id);
     if (!visit) return res.status(404).json({ success: false, message: 'Visit not found' });
-    if (req.user.role === 'faculty' && visit.faculty.toString() !== req.user.id.toString())
+    const facultyId = visit.faculty?._id || visit.faculty;
+    if (req.user.role === 'faculty' && String(facultyId) !== String(req.user.id))
       return res.status(403).json({ success: false, message: 'Access denied' });
-    const existing = visit.formSubmissions.findIndex(f => f.formType === formType);
-    if (existing >= 0) visit.formSubmissions[existing] = { formType, data, submittedAt: new Date() };
-    else visit.formSubmissions.push({ formType, data, submittedAt: new Date() });
-    await visit.save();
-    res.json({ success: true, message: 'Form saved', data: visit.formSubmissions });
+    const updated = await db.updateVisitForm(req.params.id, formType, data);
+    res.json({ success: true, message: 'Form saved', data: updated.formSubmissions });
   } catch (err) { next(err); }
 };
 
 exports.getForms = async (req, res, next) => {
   try {
-    const visit = await Visit.findById(req.params.id)
-      .populate('faculty', 'name email department phone')
-      .populate('hostel', 'name type location');
+    const visit = await db.findVisitById(req.params.id, { includeRelations: true });
     if (!visit) return res.status(404).json({ success: false, message: 'Visit not found' });
-    if (req.user.role === 'faculty' && visit.faculty._id.toString() !== req.user.id.toString())
+    if (req.user.role === 'faculty' && String(visit.faculty._id) !== String(req.user.id))
       return res.status(403).json({ success: false, message: 'Access denied' });
     res.json({
       success: true,
@@ -46,9 +42,7 @@ exports.getForms = async (req, res, next) => {
 exports.downloadForm = async (req, res, next) => {
   try {
     const { formType } = req.params;
-    const visit = await Visit.findById(req.params.id)
-      .populate('faculty', 'name email department phone')
-      .populate('hostel', 'name type');
+    const visit = await db.findVisitById(req.params.id, { includeRelations: true });
     if (!visit) return res.status(404).json({ success: false, message: 'Visit not found' });
     const submission = visit.formSubmissions.find(f => f.formType === formType);
     if (!submission) return res.status(404).json({ success: false, message: 'Form not submitted yet' });

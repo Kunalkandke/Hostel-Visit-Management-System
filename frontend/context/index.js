@@ -24,11 +24,12 @@ export function AuthProvider({ children }) {
   const login = async (email, password) => {
     const res = await api.post('/auth/login', { email, password });
     const { token, user: u } = res.data.data;
+    const normalizedUser = { ...u, role: String(u?.role || '').trim().toLowerCase() };
     localStorage.setItem('hvms_token', token);
-    localStorage.setItem('hvms_user', JSON.stringify(u));
+    localStorage.setItem('hvms_user', JSON.stringify(normalizedUser));
     api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-    setUser(u);
-    return u;
+    setUser(normalizedUser);
+    return normalizedUser;
   };
 
   const logout = async () => {
@@ -43,9 +44,10 @@ export function AuthProvider({ children }) {
     try {
       const res = await api.get('/auth/me');
       const u = res.data.data;
-      setUser(u);
-      localStorage.setItem('hvms_user', JSON.stringify(u));
-      return u;
+      const normalizedUser = { ...u, role: String(u?.role || '').trim().toLowerCase() };
+      setUser(normalizedUser);
+      localStorage.setItem('hvms_user', JSON.stringify(normalizedUser));
+      return normalizedUser;
     } catch (_) {}
   };
 

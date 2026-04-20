@@ -1,18 +1,17 @@
 // hostelController.js
-const { Hostel } = require('../models/index');
-const User = require('../models/User');
+const db = require('../data/db');
 const { auditLogger } = require('../middleware/helpers');
 
 exports.getAll = async (req, res, next) => {
   try {
-    const hostels = await Hostel.find({ isActive: true }).populate('warden', 'name email phone').sort({ name: 1 });
+    const hostels = await db.listHostels({ includeWarden: true, includeInactive: false });
     res.json({ success: true, data: hostels });
   } catch (err) { next(err); }
 };
 
 exports.getById = async (req, res, next) => {
   try {
-    const h = await Hostel.findById(req.params.id).populate('warden', 'name email phone');
+    const h = await db.findHostelById(req.params.id, { includeWarden: true, includeInactive: true });
     if (!h) return res.status(404).json({ success: false, message: 'Not found' });
     res.json({ success: true, data: h });
   } catch (err) { next(err); }
@@ -21,7 +20,7 @@ exports.getById = async (req, res, next) => {
 exports.create = async (req, res, next) => {
   try {
     const { name, type, capacity, location } = req.body;
-    const h = await Hostel.create({ name, type, capacity: Number(capacity), location });
+    const h = await db.createHostel({ name, type, capacity: Number(capacity), location });
     auditLogger(req.user.id, 'CREATE_HOSTEL', h._id, 'Hostel', { name }, req.ip);
     res.status(201).json({ success: true, message: 'Hostel created', data: h });
   } catch (err) { next(err); }
@@ -29,7 +28,7 @@ exports.create = async (req, res, next) => {
 
 exports.update = async (req, res, next) => {
   try {
-    const h = await Hostel.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
+    const h = await db.updateHostelById(req.params.id, req.body);
     if (!h) return res.status(404).json({ success: false, message: 'Not found' });
     auditLogger(req.user.id, 'UPDATE_HOSTEL', h._id, 'Hostel', {}, req.ip);
     res.json({ success: true, message: 'Updated', data: h });
@@ -39,20 +38,26 @@ exports.update = async (req, res, next) => {
 exports.assignWarden = async (req, res, next) => {
   try {
     const { wardenId } = req.body;
-    const warden = await User.findOne({ _id: wardenId, role: 'warden' });
+    const currentHostel = await db.findHostelById(req.params.id, { includeWarden: true, includeInactive: true });
+    if (!currentHostel) return res.status(404).json({ success: false, message: 'Hostel not found' });
+    const warden = await db.findUserById(wardenId);
+    if (warden && warden.role !== 'warden') return res.status(404).json({ success: false, message: 'Warden not found' });
     if (!warden) return res.status(404).json({ success: false, message: 'Warden not found' });
-    await Hostel.updateMany({ warden: wardenId }, { warden: null });
-    const h = await Hostel.findByIdAndUpdate(req.params.id, { warden: wardenId }, { new: true }).populate('warden', 'name email');
-    if (!h) return res.status(404).json({ success: false, message: 'Hostel not found' });
-    await User.findByIdAndUpdate(wardenId, { assignedHostel: h._id });
+    await db.clearWardenAssignments(wardenId);
+    await db.updateUserById(wardenId, { assignedHostel: req.params.id });
+    if (currentHostel.warden?._id && String(currentHostel.warden._id) !== String(wardenId)) {
+      await db.updateUserById(currentHostel.warden._id, { assignedHostel: null });
+    }
+    const h = await db.updateHostelById(req.params.id, { warden: wardenId });
+    const withWarden = await db.findHostelById(h._id, { includeWarden: true, includeInactive: true });
     auditLogger(req.user.id, 'ASSIGN_WARDEN', h._id, 'Hostel', { wardenId }, req.ip);
-    res.json({ success: true, message: 'Warden assigned', data: h });
+    res.json({ success: true, message: 'Warden assigned', data: withWarden });
   } catch (err) { next(err); }
 };
 
 exports.remove = async (req, res, next) => {
   try {
-    const h = await Hostel.findByIdAndUpdate(req.params.id, { isActive: false }, { new: true });
+    const h = await db.updateHostelById(req.params.id, { isActive: false });
     if (!h) return res.status(404).json({ success: false, message: 'Not found' });
     auditLogger(req.user.id, 'DELETE_HOSTEL', h._id, 'Hostel', {}, req.ip);
     res.json({ success: true, message: 'Deactivated' });

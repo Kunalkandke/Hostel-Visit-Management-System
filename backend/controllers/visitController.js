@@ -1,5 +1,4 @@
-const { Visit, Hostel } = require('../models/index');
-const User = require('../models/User');
+const db = require('../data/db');
 const { auditLogger } = require('../middleware/helpers');
 const { sendVisitCompletedEmail } = require('../services/emailService');
 
@@ -8,21 +7,19 @@ exports.startVisit = async (req, res, next) => {
     const { hostelId, purpose, purposeDetail, facultyRemarks } = req.body;
     if (!hostelId || !purpose) return res.status(400).json({ success: false, message: 'Hostel and purpose required' });
 
-    const active = await Visit.findOne({ faculty: req.user.id, status: 'active' });
+    const active = await db.findOneVisit({ faculty: req.user.id, status: 'active' });
     if (active) return res.status(400).json({ success: false, message: 'You already have an active visit. End it first.' });
 
-    const hostel = await Hostel.findById(hostelId);
+    const hostel = await db.findHostelById(hostelId, { includeInactive: false });
     if (!hostel) return res.status(404).json({ success: false, message: 'Hostel not found' });
 
-    const visit = await Visit.create({
+    const created = await db.createVisit({
       faculty: req.user.id, hostel: hostelId, purpose,
       purposeDetail: purposeDetail || null,
       facultyRemarks: facultyRemarks || null,
       checkIn: new Date(), status: 'active',
     });
-
-    await visit.populate('hostel', 'name type location');
-    await visit.populate('faculty', 'name email department');
+    const visit = await db.findVisitById(created._id, { includeRelations: true });
 
     auditLogger(req.user.id, 'START_VISIT', visit._id, 'Visit', { hostelId, purpose }, req.ip);
     res.status(201).json({ success: true, message: 'Visit started', data: visit });
@@ -31,25 +28,26 @@ exports.startVisit = async (req, res, next) => {
 
 exports.endVisit = async (req, res, next) => {
   try {
-    const visit = await Visit.findById(req.params.id).populate('hostel').populate('faculty', 'name email department');
+    const visit = await db.findVisitById(req.params.id, { includeRelations: true, includeWardenInHostel: true });
     if (!visit) return res.status(404).json({ success: false, message: 'Visit not found' });
-    if (visit.faculty._id.toString() !== req.user.id.toString()) return res.status(403).json({ success: false, message: 'Not your visit' });
+    if (String(visit.faculty._id) !== String(req.user.id)) return res.status(403).json({ success: false, message: 'Not your visit' });
     if (visit.status === 'completed') return res.status(400).json({ success: false, message: 'Already completed' });
 
     const checkOut = new Date();
     const duration = Math.max(1, Math.round((checkOut - visit.checkIn) / 60000));
 
-    visit.checkOut = checkOut;
-    visit.duration = duration;
-    visit.status = 'completed';
-    if (req.body.facultyRemarks) visit.facultyRemarks = req.body.facultyRemarks;
-    await visit.save();
+    const updated = await db.updateVisitById(req.params.id, {
+      checkOut,
+      duration,
+      status: 'completed',
+      ...(req.body.facultyRemarks !== undefined && { facultyRemarks: req.body.facultyRemarks }),
+    });
 
-    auditLogger(req.user.id, 'END_VISIT', visit._id, 'Visit', { duration }, req.ip);
+    auditLogger(req.user.id, 'END_VISIT', req.params.id, 'Visit', { duration }, req.ip);
 
     // Email warden if assigned
-    if (visit.hostel?.warden) {
-      const warden = await User.findById(visit.hostel.warden);
+    if (visit.hostel?.warden?._id) {
+      const warden = await db.findUserById(visit.hostel.warden._id);
       if (warden?.email) {
         sendVisitCompletedEmail({
           wardenEmail: warden.email,
@@ -65,8 +63,8 @@ exports.endVisit = async (req, res, next) => {
         }).catch(() => {});
       }
     }
-
-    res.json({ success: true, message: 'Visit ended successfully', data: visit });
+    const responseVisit = await db.findVisitById(updated._id, { includeRelations: true, includeWardenInHostel: true });
+    res.json({ success: true, message: 'Visit ended successfully', data: responseVisit });
   } catch (err) { next(err); }
 };
 
@@ -77,22 +75,19 @@ exports.getMyVisits = async (req, res, next) => {
     
     // If warden, show visits to their hostel; if faculty, show their own visits
     if (req.user.role === 'warden') {
-      const warden = await User.findById(req.user.id);
+      const warden = await db.findUserById(req.user.id);
       if (!warden?.assignedHostel) return res.json({ success: true, data: { visits: [], pagination: { total: 0, page: 1, pages: 0 } } });
-      filter.hostel = warden.assignedHostel;
+      filter.hostel = warden.assignedHostel._id || warden.assignedHostel;
     } else {
       filter.faculty = req.user.id;
     }
     
     if (status) filter.status = status;
     if (hostelId) filter.hostel = hostelId;
-    if (from || to) { filter.checkIn = {}; if (from) filter.checkIn.$gte = new Date(from); if (to) filter.checkIn.$lte = new Date(to); }
+    if (from) filter.fromCheckIn = new Date(from);
+    if (to) filter.toCheckIn = new Date(to);
 
-    const total = await Visit.countDocuments(filter);
-    const visits = await Visit.find(filter)
-      .populate('hostel', 'name type location')
-      .populate('faculty', 'name email department phone')
-      .sort({ checkIn: -1 }).skip((page - 1) * limit).limit(Number(limit));
+    const { total, visits } = await db.listVisits(filter, { page, limit, includeRelations: true });
 
     res.json({ success: true, data: { visits, pagination: { total, page: Number(page), pages: Math.ceil(total / limit) } } });
   } catch (err) { next(err); }
@@ -102,30 +97,31 @@ exports.getActiveVisits = async (req, res, next) => {
   try {
     const filter = { status: 'active' };
     if (req.user.role === 'warden') {
-      const warden = await User.findById(req.user.id);
+      const warden = await db.findUserById(req.user.id);
       if (!warden?.assignedHostel) return res.json({ success: true, data: [] });
-      filter.hostel = warden.assignedHostel;
+      filter.hostel = warden.assignedHostel._id || warden.assignedHostel;
     }
-    const visits = await Visit.find(filter)
-      .populate('faculty', 'name email department phone')
-      .populate('hostel', 'name type location')
-      .sort({ checkIn: -1 });
+    const { visits } = await db.listVisits(filter, { page: 1, limit: 1000, includeRelations: true });
     res.json({ success: true, data: visits });
   } catch (err) { next(err); }
 };
 
 exports.verifyVisit = async (req, res, next) => {
   try {
-    const visit = await Visit.findById(req.params.id);
+    const visit = await db.findVisitById(req.params.id);
     if (!visit) return res.status(404).json({ success: false, message: 'Visit not found' });
-    const warden = await User.findById(req.user.id);
-    if (warden?.assignedHostel?.toString() !== visit.hostel.toString())
+    const warden = await db.findUserById(req.user.id);
+    const wardenHostelId = warden?.assignedHostel?._id || warden?.assignedHostel;
+    const visitHostelId = visit.hostel?._id || visit.hostel;
+    if (String(wardenHostelId) !== String(visitHostelId))
       return res.status(403).json({ success: false, message: 'Not your hostel' });
-    visit.isVerified = true;
-    if (req.body.wardenRemarks) visit.wardenRemarks = req.body.wardenRemarks;
-    await visit.save();
+    const updated = await db.updateVisitById(req.params.id, {
+      isVerified: true,
+      ...(req.body.wardenRemarks !== undefined && { wardenRemarks: req.body.wardenRemarks }),
+    });
     auditLogger(req.user.id, 'VERIFY_VISIT', visit._id, 'Visit', {}, req.ip);
-    res.json({ success: true, message: 'Visit verified', data: visit });
+    const responseVisit = await db.findVisitById(updated._id, { includeRelations: true });
+    res.json({ success: true, message: 'Visit verified', data: responseVisit });
   } catch (err) { next(err); }
 };
 
@@ -136,13 +132,10 @@ exports.getAllVisits = async (req, res, next) => {
     if (status) filter.status = status;
     if (hostelId) filter.hostel = hostelId;
     if (facultyId) filter.faculty = facultyId;
-    if (from || to) { filter.checkIn = {}; if (from) filter.checkIn.$gte = new Date(from); if (to) filter.checkIn.$lte = new Date(to); }
+    if (from) filter.fromCheckIn = new Date(from);
+    if (to) filter.toCheckIn = new Date(to);
 
-    const total = await Visit.countDocuments(filter);
-    const visits = await Visit.find(filter)
-      .populate('faculty', 'name email department')
-      .populate('hostel', 'name type')
-      .sort({ checkIn: -1 }).skip((page - 1) * limit).limit(Number(limit));
+    const { total, visits } = await db.listVisits(filter, { page, limit, includeRelations: true });
 
     res.json({ success: true, data: { visits, pagination: { total, page: Number(page), pages: Math.ceil(total / limit) } } });
   } catch (err) { next(err); }
@@ -150,9 +143,7 @@ exports.getAllVisits = async (req, res, next) => {
 
 exports.getVisitById = async (req, res, next) => {
   try {
-    const visit = await Visit.findById(req.params.id)
-      .populate('faculty', 'name email department phone')
-      .populate({ path: 'hostel', populate: { path: 'warden', select: 'name email' } });
+    const visit = await db.findVisitById(req.params.id, { includeRelations: true, includeWardenInHostel: true });
     if (!visit) return res.status(404).json({ success: false, message: 'Not found' });
     res.json({ success: true, data: visit });
   } catch (err) { next(err); }
