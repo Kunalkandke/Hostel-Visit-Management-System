@@ -7,6 +7,8 @@ import { visitService, hostelService, getErr } from '../../../services/index';
 import { useAuth } from '../../../context/index';
 import { fmtDateTime, fmtDuration, getPurpose } from '../../../utils/constants';
 import toast from 'react-hot-toast';
+import VisitFormModal from '../../../components/VisitFormModal';
+import api from '../../../services/api';
 
 function VisitHistoryPage() {
   const { user } = useAuth();
@@ -15,6 +17,8 @@ function VisitHistoryPage() {
   const [pg, setPg] = useState({ page: 1, pages: 1, total: 0 });
   const [filters, setFilters] = useState({ status: '', hostelId: '', from: '', to: '' });
   const [loading, setLoading] = useState(true);
+  const [formVisit, setFormVisit] = useState(null);
+  const [formModal, setFormModal] = useState(false);
   const [detail, setDetail] = useState(null);
   const [verifyModal, setVerifyModal] = useState(null);
   const [wardenRemarks, setWardenRemarks] = useState('');
@@ -44,6 +48,16 @@ function VisitHistoryPage() {
       fetchVisits(pg.page);
     } catch (e) { toast.error(getErr(e)); }
     finally { setVerifying(false); }
+  };
+
+  const openForms = async (visit) => {
+    try {
+      const res = await api.get(`/visits/${visit._id}/forms`);
+      setFormVisit({ ...res.data.data.visit, formSubmissions: res.data.data.forms, id: visit._id });
+    } catch {
+      setFormVisit({ ...visit, formSubmissions: [], id: visit._id });
+    }
+    setFormModal(true);
   };
 
   return (
@@ -97,7 +111,12 @@ function VisitHistoryPage() {
                     <td><span className={v.status === 'active' ? 'badge-active' : 'badge-completed'}>{v.status}</span></td>
                     <td className="text-center">{v.isVerified ? <span className="text-emerald-500 font-bold text-lg">✓</span> : <span className="text-slate-300">—</span>}</td>
                     <td>
-                      <button onClick={() => setDetail(v)} className="text-blue-600 hover:text-blue-800 text-xs font-semibold">View</button>
+                      <div className="flex gap-2">
+                        <button onClick={() => setDetail(v)} className="text-blue-600 hover:text-blue-800 text-xs font-semibold">View</button>
+                        {v.status === 'completed' && (
+                          <button onClick={() => openForms(v)} className="text-emerald-600 hover:text-emerald-800 text-xs font-semibold">Forms</button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -127,6 +146,12 @@ function VisitHistoryPage() {
           </div>
         )}
       </Modal>
+      <VisitFormModal
+        open={formModal}
+        onClose={() => { setFormModal(false); setFormVisit(null); }}
+        visit={formVisit || {}}
+        readOnly={user.role !== 'faculty'}
+      />
     </DashboardLayout>
   );
 }

@@ -21,6 +21,12 @@ const visitSchema = new mongoose.Schema({
   facultyRemarks: { type: String, trim: true, default: null },
   wardenRemarks: { type: String, trim: true, default: null },
   isVerified: { type: Boolean, default: false },
+  // Form submissions after visit completion
+  formSubmissions: [{
+    formType: { type: String, enum: ['anti_ragging', 'mess_feedback'] },
+    submittedAt: { type: Date, default: Date.now },
+    data: { type: mongoose.Schema.Types.Mixed },
+  }],
 }, { timestamps: true });
 
 visitSchema.index({ faculty: 1, status: 1 });

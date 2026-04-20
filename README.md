@@ -134,7 +134,7 @@ Create `backend/.env`:
 
 ```env
 PORT=5000
-MONGODB_URI=mongodb://localhost:27017/hsvp
+MONGODB_URI=Your_MongoDB_URL
 JWT_SECRET=change_this_to_something_long_and_random
 NODE_ENV=development
 FRONTEND_URL=http://localhost:3000

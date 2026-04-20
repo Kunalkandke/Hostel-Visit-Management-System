@@ -9,6 +9,7 @@ import { adminService, visitService, getErr } from '../../services/index';
 import { fmtDateTime, fmtDuration, getPurpose } from '../../utils/constants';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts';
 import toast from 'react-hot-toast';
+import VisitFormModal from '../../components/VisitFormModal';
 
 function Dashboard() {
   const { user } = useAuth();
@@ -20,6 +21,8 @@ function Dashboard() {
   const [endModal, setEndModal] = useState(false);
   const [endRemarks, setEndRemarks] = useState('');
   const [ending, setEnding] = useState(false);
+  const [formModal, setFormModal] = useState(false);
+  const [completedVisit, setCompletedVisit] = useState(null);
 
   useEffect(() => { loadData(); }, []);
 
@@ -42,8 +45,11 @@ function Dashboard() {
     setEnding(true);
     try {
       await visitService.endVisit(activeVisit._id, { facultyRemarks: endRemarks });
+      const ended = { ...activeVisit, checkOut: new Date(), status: 'completed' };
       setVisit(null);
       setEndModal(false);
+      setCompletedVisit(ended);
+      setFormModal(true);
       toast.success('Visit ended. Warden notified via email.');
       loadData();
     } catch (e) { toast.error(getErr(e)); }
@@ -223,6 +229,11 @@ function Dashboard() {
           </div>
         </div>
       </Modal>
+      <VisitFormModal
+        open={formModal}
+        onClose={() => setFormModal(false)}
+        visit={completedVisit || {}}
+      />
     </DashboardLayout>
   );
 }

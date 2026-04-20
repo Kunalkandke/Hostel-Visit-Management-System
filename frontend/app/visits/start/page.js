@@ -8,6 +8,7 @@ import { visitService, hostelService, getErr } from '../../../services/index';
 import { useVisit } from '../../../context/index';
 import { PURPOSES, fmtDateTime } from '../../../utils/constants';
 import toast from 'react-hot-toast';
+import VisitFormModal from '../../../components/VisitFormModal';
 
 function StartVisitPage() {
   const router = useRouter();
@@ -20,6 +21,8 @@ function StartVisitPage() {
   const [endModal, setEndModal] = useState(false);
   const [endRemarks, setEndRemarks] = useState('');
   const [ending, setEnding] = useState(false);
+  const [formModal, setFormModal] = useState(false);
+  const [completedVisit, setCompletedVisit] = useState(null);
 
   useEffect(() => {
     hostelService.getAll().then(r => setHostels(r.data.data)).catch(() => {});
@@ -58,9 +61,12 @@ function StartVisitPage() {
     setEnding(true);
     try {
       await visitService.endVisit(activeVisit._id, { facultyRemarks: endRemarks });
+      const ended = { ...activeVisit, checkOut: new Date(), status: 'completed' };
       setVisit(null);
       setEndModal(false);
       setEndRemarks('');
+      setCompletedVisit(ended);
+      setFormModal(true);
       toast.success('Visit ended. Warden notified via email.');
     } catch (e) { toast.error(getErr(e)); }
     finally { setEnding(false); }
@@ -256,6 +262,11 @@ function StartVisitPage() {
           </form>
         </div>
       </div>
+      <VisitFormModal
+        open={formModal}
+        onClose={() => setFormModal(false)}
+        visit={completedVisit || {}}
+      />
     </DashboardLayout>
   );
 }
