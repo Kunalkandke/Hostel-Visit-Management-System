@@ -18,11 +18,24 @@ const envAllowedOrigins = [process.env.FRONTEND_URL, process.env.FRONTEND_URLS]
   .filter(Boolean);
 const allowedOrigins = Array.from(new Set([...defaultAllowedOrigins, ...envAllowedOrigins].map(normalizeOrigin)));
 
+// Log allowed origins for debugging
+console.log('🔐 Allowed CORS origins:', allowedOrigins);
+
 app.use(cors({
   origin(origin, callback) {
-    if (!origin || allowedOrigins.includes(normalizeOrigin(origin))) {
+    // Allow requests with no origin (mobile apps, Postman, etc.)
+    if (!origin) {
       return callback(null, true);
     }
+    
+    const normalizedOrigin = normalizeOrigin(origin);
+    
+    // Allow all vercel.app domains in production
+    if (normalizedOrigin.endsWith('.vercel.app') || allowedOrigins.includes(normalizedOrigin)) {
+      return callback(null, true);
+    }
+    
+    console.error(`❌ CORS blocked for origin: ${origin}`);
     return callback(new Error(`CORS blocked for origin: ${origin}`));
   },
   credentials: true
