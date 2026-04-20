@@ -44,7 +44,7 @@ export const adminService = {
 
 export const getErr = (err) => {
   if (!err.response && (err.message === 'Network Error' || err.code === 'ERR_NETWORK')) {
-    return 'Cannot connect to server. Make sure the backend is running on port 5000.';
+    return 'Cannot connect to server. Please check your internet connection or contact support.';
   }
   return err?.response?.data?.message || err?.message || 'Something went wrong';
 };
