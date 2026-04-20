@@ -80,21 +80,32 @@ function ReportsPage() {
 
   const generate = useCallback(async () => {
     setLoading(true);
+    setData(null);
     try {
       let res;
       const params = { sortBy, order: sortOrder };
+      
       if (tab === 'daily') {
         res = await adminService.getDailyReport(date, params);
       } else if (tab === 'monthly') {
         res = await adminService.getMonthlyReport(month, year);
       } else if (tab === 'by-hostel') {
         res = await adminService.getByHostelReport({ ...range, ...params });
-      } else {
+      } else if (tab === 'by-faculty') {
         res = await adminService.getByFacultyReport({ ...range, ...params, department: deptFilter });
       }
-      setData(res.data.data);
+      
+      if (res?.data?.data) {
+        setData(res.data.data);
+        toast.success('Report generated successfully!');
+      } else {
+        toast.error('No data returned from server');
+      }
     } catch (e) {
-      toast.error(getErr(e));
+      console.error('Report generation error:', e);
+      const errorMsg = getErr(e);
+      toast.error(errorMsg || 'Failed to generate report');
+      setData(null);
     } finally {
       setLoading(false);
     }
@@ -104,33 +115,82 @@ function ReportsPage() {
   useEffect(() => { generate(); }, [tab]);
 
   const exportCSV = () => {
-    if (!data) return;
-    let rows = [], headers = [];
-    if (tab === 'daily' && data.visits) {
-      headers = ['Faculty', 'Department', 'Hostel', 'Purpose', 'Check-in', 'Check-out', 'Duration (min)', 'Status'];
-      rows = data.visits.map(v => [
-        v.faculty?.name, v.faculty?.department, v.hostel?.name,
-        v.purpose, v.checkIn ? new Date(v.checkIn).toLocaleString() : '',
-        v.checkOut ? new Date(v.checkOut).toLocaleString() : '',
-        v.duration || '', v.status,
-      ]);
-    } else if (tab === 'by-hostel' && Array.isArray(data)) {
-      headers = ['Hostel', 'Type', 'Total Visits', 'Completed', 'Avg Duration (min)'];
-      rows = data.map(r => [r.hostelName, r.type, r.totalVisits, r.completedVisits, r.avgDuration || '']);
-    } else if (tab === 'by-faculty' && Array.isArray(data)) {
-      headers = ['Name', 'Email', 'Department', 'Total Visits', 'Completed', 'Avg Duration (min)', 'Last Visit'];
-      rows = data.map(r => [r.facultyName, r.email, r.department, r.totalVisits, r.completedVisits, r.avgDuration || '', r.lastVisit ? new Date(r.lastVisit).toLocaleDateString() : '']);
-    } else if (tab === 'monthly' && data.dailyBreakdown) {
-      headers = ['Date', 'Total Visits', 'Completed'];
-      rows = data.dailyBreakdown.map(r => [r._id, r.count, r.completed]);
+    try {
+      if (!data) {
+        toast.error('No data available to export');
+        return;
+      }
+      
+      let rows = [], headers = [];
+      
+      if (tab === 'daily' && data.visits) {
+        headers = ['Faculty', 'Department', 'Hostel', 'Purpose', 'Check-in', 'Check-out', 'Duration (min)', 'Status'];
+        rows = data.visits.map(v => [
+          v.faculty?.name || '',
+          v.faculty?.department || '',
+          v.hostel?.name || '',
+          v.purpose || '',
+          v.checkIn ? new Date(v.checkIn).toLocaleString() : '',
+          v.checkOut ? new Date(v.checkOut).toLocaleString() : '',
+          v.duration || '',
+          v.status || '',
+        ]);
+      } else if (tab === 'by-hostel' && Array.isArray(data)) {
+        headers = ['Hostel', 'Type', 'Total Visits', 'Completed', 'Avg Duration (min)'];
+        rows = data.map(r => [
+          r.hostelName || '',
+          r.type || '',
+          r.totalVisits || 0,
+          r.completedVisits || 0,
+          r.avgDuration || ''
+        ]);
+      } else if (tab === 'by-faculty' && Array.isArray(data)) {
+        headers = ['Name', 'Email', 'Department', 'Total Visits', 'Completed', 'Avg Duration (min)', 'Last Visit'];
+        rows = data.map(r => [
+          r.facultyName || '',
+          r.email || '',
+          r.department || '',
+          r.totalVisits || 0,
+          r.completedVisits || 0,
+          r.avgDuration || '',
+          r.lastVisit ? new Date(r.lastVisit).toLocaleDateString() : ''
+        ]);
+      } else if (tab === 'monthly' && data.dailyBreakdown) {
+        headers = ['Date', 'Total Visits', 'Completed'];
+        rows = data.dailyBreakdown.map(r => [
+          r._id || '',
+          r.count || 0,
+          r.completed || 0
+        ]);
+      }
+      
+      if (!rows.length) {
+        toast.error('No data to export');
+        return;
+      }
+      
+      // Create CSV content
+      const csv = [headers, ...rows]
+        .map(r => r.map(c => `"${String(c ?? '').replace(/"/g, '""')}"`).join(','))
+        .join('\n');
+      
+      // Create and download file
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `hvms-${tab}-${date || new Date().toISOString().split('T')[0]}.csv`;
+      link.style.display = 'none';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      
+      toast.success('Report exported successfully!');
+    } catch (error) {
+      console.error('Export error:', error);
+      toast.error('Failed to export report. Please try again.');
     }
-    if (!rows.length) return toast.error('No data to export');
-    const csv = [headers, ...rows].map(r => r.map(c => `"${c ?? ''}"`).join(',')).join('\n');
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
-    a.download = `hvms-${tab}-${date || new Date().toISOString().split('T')[0]}.csv`;
-    a.click();
-    URL.revokeObjectURL(a.href);
   };
 
   const currentSortOptions = SORT_OPTIONS[tab] || [];

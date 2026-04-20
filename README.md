@@ -260,9 +260,11 @@ Health check:
 
 ### Backend
 ```bash
-npm run dev     # start with nodemon
-npm start       # start server
-npm run seed    # seed admin (from backend/.env)
+npm run dev         # start with nodemon
+npm start           # start server
+npm run seed        # seed admin (from backend/.env)
+npm run setup       # initialize database with sample data
+npm run test-login  # test login system and verify accounts
 ```
 
 ### Frontend
@@ -274,11 +276,85 @@ npm start
 
 ---
 
+## 🧪 Testing & Debugging
+
+### Test Login System
+```bash
+cd backend
+npm run test-login
+```
+
+This diagnostic script will:
+- ✅ Test database connection
+- ✅ Verify admin account exists
+- ✅ List all users in the system
+- ✅ Create test faculty/warden accounts if needed
+- ✅ Verify password hashing
+
+### Setup Production Data
+```bash
+cd backend
+npm run setup
+```
+
+This will create:
+- Admin account
+- 3 sample faculty accounts
+- 2 sample warden accounts
+- 4 sample hostels
+
+**Default Test Accounts:**
+- Faculty: `rajesh.kumar@college.edu.in` / `Faculty@123`
+- Warden: `suresh.reddy@college.edu.in` / `Warden@123`
+
+---
+
 ## 🏗️ Production Notes
-- Set `FRONTEND_URL` in `backend/.env` to your deployed frontend domain for CORS.
-- Set `NEXT_PUBLIC_API_URL` in `frontend/.env.local` (or your hosting provider env vars) to your deployed backend, e.g. `https://api.example.com/api/v1`.
-- Set `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` in backend environment variables.
-- Build frontend with `npm run build` and serve via `npm start`.
+
+### Deployment Checklist
+
+**Backend (Render/Railway/Heroku):**
+1. Set environment variables (see `.env.example`)
+2. Ensure `NODE_ENV=production`
+3. Set `FRONTEND_URL` to your Vercel URL
+4. Run `npm run setup` after first deploy (creates sample data)
+5. Check logs for CORS and connection issues
+
+**Frontend (Vercel/Netlify):**
+1. Set `NEXT_PUBLIC_API_URL` to your backend URL
+2. Example: `https://your-backend.onrender.com/api/v1`
+3. Redeploy after changing environment variables
+
+### CORS Configuration
+The backend automatically allows:
+- All `.vercel.app` domains
+- Domains specified in `FRONTEND_URL` env variable
+- Domains in `FRONTEND_URLS` (comma-separated)
+
+### Common Issues
+
+**"Cannot connect to server"**
+- Check backend is running: Visit `https://your-backend.com/api/health`
+- Verify `NEXT_PUBLIC_API_URL` in Vercel matches your backend URL
+- Check CORS settings in backend logs
+- See [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md) for detailed troubleshooting
+
+**"Invalid credentials"**
+- Run `npm run test-login` to verify accounts exist
+- Check user is active in database
+- Verify password is correct
+
+**Faculty can't login**
+- Login as admin first
+- Create faculty users via Admin → Users page
+- Or run `npm run setup` to create sample accounts
+
+### Monitoring
+- Backend logs show all login attempts with success/failure reasons
+- Look for `✅ Login successful` or `❌ Login failed` messages
+- CORS issues show as `❌ CORS blocked for origin: ...`
+
+For detailed deployment instructions, see [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md)
 
 ---
 

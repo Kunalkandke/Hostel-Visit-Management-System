@@ -1,7 +1,14 @@
 import axios from 'axios';
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://hostel-visit-management-system.onrender.com/api/v1';
+
+// Log the API URL being used (only in browser)
+if (typeof window !== 'undefined') {
+  console.log('🔗 API URL:', API_URL);
+}
+
 const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || 'https://hostel-visit-management-system.onrender.com/api/v1',
+  baseURL: API_URL,
   timeout: 15000,
 });
 
