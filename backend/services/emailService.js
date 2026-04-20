@@ -89,7 +89,7 @@ exports.sendWelcomeEmail = async ({ name, email, password, role, department }) =
 
             <!-- CTA -->
             <div style="text-align:center;margin-bottom:32px;">
-              <a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}/login" 
+              <a href="${process.env.FRONTEND_URL || 'https://hvms-system.vercel.app'}/login" 
                  style="display:inline-block;background:linear-gradient(135deg,#1e3a8a,#1d4ed8);color:#ffffff;font-weight:700;font-size:15px;padding:14px 40px;border-radius:10px;text-decoration:none;letter-spacing:0.3px;">
                 Login to Your Account →
               </a>

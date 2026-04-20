@@ -9,7 +9,24 @@ const { errorHandler } = require('./middleware/helpers');
 const app = express();
 
 app.use(helmet());
-app.use(cors({ origin: process.env.FRONTEND_URL || 'http://localhost:3000', credentials: true }));
+const normalizeOrigin = (value) => (value || '').trim().replace(/\/+$/, '');
+const defaultAllowedOrigins = ['https://hvms-system.vercel.app', 'http://localhost:3000'];
+const envAllowedOrigins = [process.env.FRONTEND_URL, process.env.FRONTEND_URLS]
+  .filter(Boolean)
+  .flatMap((value) => value.split(','))
+  .map(normalizeOrigin)
+  .filter(Boolean);
+const allowedOrigins = Array.from(new Set([...defaultAllowedOrigins, ...envAllowedOrigins].map(normalizeOrigin)));
+
+app.use(cors({
+  origin(origin, callback) {
+    if (!origin || allowedOrigins.includes(normalizeOrigin(origin))) {
+      return callback(null, true);
+    }
+    return callback(new Error(`CORS blocked for origin: ${origin}`));
+  },
+  credentials: true
+}));
 app.use(express.json({ limit: '10kb' }));
 app.use(express.urlencoded({ extended: true }));
 if (process.env.NODE_ENV === 'development') app.use(morgan('dev'));

@@ -352,7 +352,7 @@ export default function VisitFormModal({ open, onClose, visit, readOnly = false 
       toast('Generating Word document...', { icon: '⏳' });
       const token = localStorage.getItem('hvms_token');
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1'}/visits/${visitId}/forms/${screen}/download`,
+        `${process.env.NEXT_PUBLIC_API_URL || 'https://hostel-visit-management-system.onrender.com/api/v1'}/visits/${visitId}/forms/${screen}/download`,
         { headers: { 'Authorization': `Bearer ${token}` } }
       );
       if (!res.ok) {
