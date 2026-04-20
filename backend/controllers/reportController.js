@@ -13,20 +13,28 @@ async function getHostelFilter(user) {
 exports.getDashboardStats = async (req, res, next) => {
   try {
     const hostelFilter = await getHostelFilter(req.user);
-    if (hostelFilter === null) return res.json({ success: true, data: { activeCount: 0, todayCount: 0, monthCount: 0, hostelWise: [] } });
+    if (hostelFilter === null) {
+      return res.json({ success: true, data: { activeCount: 0, todayCount: 0, monthCount: 0, hostelWise: [] } });
+    }
     const stats = await db.getDashboardStats(hostelFilter.hostel || null);
     res.json({ success: true, data: stats });
-  } catch (err) { next(err); }
+  } catch (err) {
+    console.error('❌ Dashboard stats error:', err.message);
+    next(err);
+  }
 };
 
 exports.getDaily = async (req, res, next) => {
   try {
     const hostelFilter = await getHostelFilter(req.user);
-    if (hostelFilter === null) return res.json({ success: true, data: { stats: { totalVisits: 0, completed: 0, active: 0, avgDuration: 0 }, visits: [] } });
+    if (hostelFilter === null) {
+      return res.json({ success: true, data: { stats: { totalVisits: 0, completed: 0, active: 0, avgDuration: 0 }, visits: [] } });
+    }
 
     const dateStr = req.query.date || new Date().toISOString().split('T')[0];
     const date = new Date(dateStr);
-    const nextDay = new Date(date); nextDay.setDate(nextDay.getDate() + 1);
+    const nextDay = new Date(date);
+    nextDay.setDate(nextDay.getDate() + 1);
 
     // Sorting
     const sortField = req.query.sortBy || 'checkIn';
@@ -36,6 +44,8 @@ exports.getDaily = async (req, res, next) => {
 
     const report = await db.getDailyReport(dateStr, hostelFilter.hostel || null, sortKey, sortOrder === 1 ? 'asc' : 'desc');
 
+    console.log(`✅ Daily report generated: ${dateStr}, ${report.visits.length} visits`);
+
     res.json({
       success: true,
       data: {
@@ -44,36 +54,57 @@ exports.getDaily = async (req, res, next) => {
         visits: report.visits,
       },
     });
-  } catch (err) { next(err); }
+  } catch (err) {
+    console.error('❌ Daily report error:', err.message);
+    next(err);
+  }
 };
 
 exports.getMonthly = async (req, res, next) => {
   try {
     const hostelFilter = await getHostelFilter(req.user);
-    if (hostelFilter === null) return res.json({ success: true, data: { total: 0, dailyBreakdown: [] } });
+    if (hostelFilter === null) {
+      return res.json({ success: true, data: { total: 0, dailyBreakdown: [] } });
+    }
 
     const month = parseInt(req.query.month) || new Date().getMonth() + 1;
     const year = parseInt(req.query.year) || new Date().getFullYear();
     const summary = await db.getMonthlyReport(month, year, hostelFilter.hostel || null);
+    
+    console.log(`✅ Monthly report generated: ${month}/${year}, ${summary.total} visits`);
+    
     res.json({ success: true, data: { month, year, total: summary.total, dailyBreakdown: summary.dailyBreakdown } });
-  } catch (err) { next(err); }
+  } catch (err) {
+    console.error('❌ Monthly report error:', err.message);
+    next(err);
+  }
 };
 
 exports.getByHostel = async (req, res, next) => {
   try {
     const hostelFilter = await getHostelFilter(req.user);
-    if (hostelFilter === null) return res.json({ success: true, data: [] });
+    if (hostelFilter === null) {
+      return res.json({ success: true, data: [] });
+    }
 
     const { from, to, sortBy = 'totalVisits', order = 'desc' } = req.query;
     const data = await db.getReportByHostel({ from, to, hostelId: hostelFilter.hostel || null, sortBy, order });
+    
+    console.log(`✅ Hostel report generated: ${data.length} hostels`);
+    
     res.json({ success: true, data });
-  } catch (err) { next(err); }
+  } catch (err) {
+    console.error('❌ Hostel report error:', err.message);
+    next(err);
+  }
 };
 
 exports.getByFaculty = async (req, res, next) => {
   try {
     const hostelFilter = await getHostelFilter(req.user);
-    if (hostelFilter === null) return res.json({ success: true, data: [] });
+    if (hostelFilter === null) {
+      return res.json({ success: true, data: [] });
+    }
 
     const { from, to, sortBy = 'totalVisits', order = 'desc', department } = req.query;
     const data = await db.getReportByFaculty({
@@ -84,6 +115,12 @@ exports.getByFaculty = async (req, res, next) => {
       sortBy,
       order,
     });
+    
+    console.log(`✅ Faculty report generated: ${data.length} faculty`);
+    
     res.json({ success: true, data });
-  } catch (err) { next(err); }
+  } catch (err) {
+    console.error('❌ Faculty report error:', err.message);
+    next(err);
+  }
 };

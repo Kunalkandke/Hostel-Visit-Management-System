@@ -6,20 +6,42 @@ const { auditLogger } = require('../middleware/helpers');
 exports.login = async (req, res, next) => {
   try {
     const { email, password } = req.body;
-    if (!email || !password) return res.status(400).json({ success: false, message: 'Email and password required' });
+    
+    // Validate input
+    if (!email || !password) {
+      console.log('❌ Login failed: Missing email or password');
+      return res.status(400).json({ success: false, message: 'Email and password required' });
+    }
 
+    // Find user
     const user = await db.findUserByEmail(email.toLowerCase(), { includePassword: true });
-    if (!user) return res.status(401).json({ success: false, message: 'Invalid credentials' });
-    if (!user.isActive) return res.status(401).json({ success: false, message: 'Account deactivated. Contact admin.' });
+    if (!user) {
+      console.log(`❌ Login failed: User not found - ${email}`);
+      return res.status(401).json({ success: false, message: 'Invalid credentials' });
+    }
+    
+    // Check if account is active
+    if (!user.isActive) {
+      console.log(`❌ Login failed: Account deactivated - ${email}`);
+      return res.status(401).json({ success: false, message: 'Account deactivated. Contact admin.' });
+    }
 
+    // Verify password
     const match = await bcrypt.compare(password, user.password);
-    if (!match) return res.status(401).json({ success: false, message: 'Invalid credentials' });
+    if (!match) {
+      console.log(`❌ Login failed: Invalid password - ${email}`);
+      return res.status(401).json({ success: false, message: 'Invalid credentials' });
+    }
 
+    // Generate token
     const token = generateToken({ userId: user._id, role: user.role, name: user.name });
     auditLogger(user._id, 'LOGIN', null, null, { email: user.email }, req.ip);
 
     const hostel = user.assignedHostel ? user.assignedHostel : null;
     const normalizedRole = String(user.role || '').trim().toLowerCase();
+    
+    console.log(`✅ Login successful: ${email} (${normalizedRole})`);
+    
     res.json({
       success: true,
       message: 'Login successful',
@@ -33,7 +55,10 @@ exports.login = async (req, res, next) => {
         },
       },
     });
-  } catch (err) { next(err); }
+  } catch (err) {
+    console.error('❌ Login error:', err.message);
+    next(err);
+  }
 };
 
 exports.logout = async (req, res, next) => {
